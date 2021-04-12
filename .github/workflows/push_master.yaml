@@ -1,0 +1,21 @@
+name: CI/CD
+on:
+  push:
+    branches:
+    - master
+jobs:
+  build:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - run: |
+        curl -L -o /tmp/balena.zip https://github.com/balena-io/balena-cli/releases/download/v11.28.5/balena-cli-v11.28.5-linux-x64-standalone.zip
+        unzip /tmp/balena.zip -d /opt
+        rm /tmp/balena.zip
+        export PATH=$PATH:/opt/balena-cli
+        balena login --token ${{ secrets.BALENA_API_TOKEN }}
+        pushd balena-pihole
+        balena push ${{ secrets.BALENA_APPLICATION_NAME }}
