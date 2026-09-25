@@ -1,0 +1,58 @@
+services:
+  # https://github.com/klutchell/unbound-docker
+  # Distroless image; ENTRYPOINT is unbound itself. The shipped
+  # /etc/unbound/unbound.conf already sets DNSSEC (baked-in root.key and
+  # root.hints under /var/unbound), RFC1918 access-control and private-address,
+  # edns-buffer-size 1232, prefetching and cache sizing. Override by mounting
+  # files into /etc/unbound/custom.conf.d/ -- never by replacing unbound.conf,
+  # which would drop all of the above.
+  unbound:
+    image: klutchell/unbound:v1.26.1@sha256:9a3939ca33d6d3b42b81a70391bb8e43f0a08d2bd7a3fdffb43d427493345c36
+    restart: unless-stopped
+    volumes:
+      - ./unbound/hardening.conf:/etc/unbound/custom.conf.d/hardening.conf:ro
+    # Listens on 53 inside the container; exposed to the host on loopback only.
+    ports:
+      - "127.0.0.1:5053:53/tcp"
+      - "127.0.0.1:5053:53/udp"
+    healthcheck:
+      # drill-hc is a wrapper built into the image that reduces drill's exit
+      # code to 0 or 1, as Docker requires.
+      test: ["CMD", "drill-hc", "@127.0.0.1", "dnssec.works"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+
+  # https://hub.docker.com/r/pihole/pihole
+  pihole:
+    image: pihole/pihole:2026.09.0@sha256:5b9c8cf51de7d6d3f2240dbe72baf5f06e1fd39cb4d77a99fab4fa13e23bd1be
+    restart: unless-stopped
+    depends_on:
+      unbound:
+        condition: service_healthy
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+    volumes:
+      - pihole_config:/etc/pihole
+    environment:
+      TZ: ${TZ:?set in .env}
+      FTLCONF_webserver_api_password: ${FTLCONF_webserver_api_password:?set in .env}
+      FTLCONF_dns_upstreams: ${FTLCONF_dns_upstreams:?set in .env}
+      FTLCONF_dns_listeningMode: all
+      # Match unbound's edns-buffer-size so large replies are not fragmented.
+      FTLCONF_misc_dnsmasq_lines: edns-packet-max=1232
+      FTLCONF_ntp_sync_active: "false"
+      # Disable the long-term query database entirely -- it is the dominant
+      # writer to the SD card. FTL keeps 24h of history in memory regardless,
+      # so the dashboard still works; it just does not survive a restart.
+      FTLCONF_database_maxDBdays: "0"
+    tmpfs:
+      - /tmp
+      - /run
+      - /var/log/pihole
+
+volumes:
+  pihole_config: {}
