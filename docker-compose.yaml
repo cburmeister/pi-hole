@@ -42,8 +42,9 @@ services:
       FTLCONF_webserver_api_password: ${FTLCONF_webserver_api_password:?set in .env}
       FTLCONF_dns_upstreams: ${FTLCONF_dns_upstreams:?set in .env}
       FTLCONF_dns_listeningMode: all
-      # Match unbound's edns-buffer-size so large replies are not fragmented.
-      FTLCONF_misc_dnsmasq_lines: edns-packet-max=1232
+      # dnsmasq directives, semicolon separated. Holds edns-packet-max and any
+      # local DNS records. See .env.example.
+      FTLCONF_misc_dnsmasq_lines: ${FTLCONF_misc_dnsmasq_lines:?set in .env}
       FTLCONF_ntp_sync_active: "false"
       # Disable the long-term query database entirely -- it is the dominant
       # writer to the SD card. FTL keeps 24h of history in memory regardless,

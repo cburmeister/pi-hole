@@ -50,6 +50,22 @@ stack. It gives you the name of the missing value.
 | `FTLCONF_webserver_api_password` | The password for the Pi-hole admin page |
 | `FTLCONF_dns_upstreams` | The resolver that Pi-hole sends queries to. Use `127.0.0.1#5053` |
 | `TZ` | The time zone |
+| `FTLCONF_misc_dnsmasq_lines` | dnsmasq directives, semicolon separated. Holds `edns-packet-max` and any local DNS records |
+
+### Local DNS records
+
+Put local names in `FTLCONF_misc_dnsmasq_lines`. One `address=` directive covers
+a subdomain and everything below it:
+
+```
+edns-packet-max=1232;address=/home.example.com/192.168.1.100
+```
+
+That makes `home.example.com` and every name under it resolve to one address.
+This is sufficient to send all internal services to a single reverse proxy. No
+record per service is necessary.
+
+Keep `edns-packet-max` first. Separate each directive with a semicolon.
 
 ### Pi-hole v6 uses different variable names
 
@@ -153,6 +169,12 @@ Unbound listens on port 53 in its container. Docker publishes that port to
 Pi-hole starts after unbound becomes healthy. Docker Compose does this with
 `depends_on` and `condition: service_healthy`. The health check uses `drill-hc`,
 a program in the unbound image, to resolve `dnssec.works`.
+
+The health check shows less than it appears to. `drill-hc` exits 0 for any
+response, and `SERVFAIL` is a response. unbound therefore reports `healthy` while
+it is answering but cannot resolve anything, for example if outbound port 53 is
+blocked. The check proves that the daemon runs. It does not prove that resolution
+works. Use the steps in **How to verify** for that.
 
 Make sure that no other program uses port 53 before the first start:
 
